@@ -67,6 +67,7 @@ def _tokenize_dataset(
             truncation=True,
             max_length=max_length,
             return_attention_mask=True,
+            return_special_tokens_mask=True,
         )
 
     return dataset.map(
@@ -130,14 +131,19 @@ def train(config: TrainingConfig | None = None) -> None:
 
     prepared_dataset = Dataset.from_dict({"text": corpus})
 
-    tokenized = _tokenize_dataset(prepared_dataset, tokenizer=tokenizer)
+    tokenized = _tokenize_dataset(prepared_dataset, tokenizer=tokenizer, pad_to_max_length=True)
 
     LOGGER.info("Instantiating model…")
     model = build_model(config.model, tokenizer)
 
     LOGGER.info("Starting trainer…")
     training_args = build_training_arguments(config)
-    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+    pad_to_multiple_of = 8 if training_args.fp16 or training_args.bf16 else None
+    data_collator = DataCollatorForLanguageModeling(
+        tokenizer=tokenizer,
+        mlm=False,
+        pad_to_multiple_of=pad_to_multiple_of,
+    )
 
     trainer = Trainer(
         model=model,
