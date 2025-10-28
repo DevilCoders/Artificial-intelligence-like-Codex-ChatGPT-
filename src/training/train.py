@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterable, List, Optional
 
 from datasets import Dataset
-from transformers import Trainer, TrainingArguments
+from transformers import DataCollatorForLanguageModeling, Trainer, TrainingArguments
 
 from .config import DatasetConfig, TrainingConfig, default_training_config
 from .chunker import CodeChunker
@@ -40,13 +40,11 @@ def _tokenize_dataset(dataset: Dataset, tokenizer, text_column: str = "text") ->
     """Tokenize the dataset into causal LM inputs."""
 
     def _map_batch(batch: dict) -> dict:
-        encodings = tokenizer(
+        return tokenizer(
             batch[text_column],
             truncation=True,
             max_length=tokenizer.model_max_length,
         )
-        encodings["labels"] = [ids[:] for ids in encodings["input_ids"]]
-        return encodings
 
     return dataset.map(
         _map_batch,
@@ -116,10 +114,13 @@ def train(config: TrainingConfig | None = None) -> None:
 
     LOGGER.info("Starting trainer…")
     training_args = build_training_arguments(config)
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=tokenized,
+        data_collator=data_collator,
     )
 
     trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
