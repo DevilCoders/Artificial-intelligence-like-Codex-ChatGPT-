@@ -36,15 +36,36 @@ def _prepare_corpus(
     return prepared
 
 
-def _tokenize_dataset(dataset: Dataset, tokenizer, text_column: str = "text") -> Dataset:
-    """Tokenize the dataset into causal LM inputs."""
+def _tokenize_dataset(
+    dataset: Dataset,
+    tokenizer,
+    text_column: str = "text",
+    pad_to_max_length: bool | None = None,
+) -> Dataset:
+    """Tokenize the dataset into causal LM inputs.
+
+    Args:
+        dataset: Dataset containing raw text chunks.
+        tokenizer: Tokenizer capable of processing the text chunks.
+        text_column: Dataset column containing the textual inputs.
+        pad_to_max_length: Whether to pad to ``tokenizer.model_max_length``. When
+            ``None`` (default) we pad if the tokenizer declares a finite
+            ``model_max_length`` so that the Trainer receives tensors with
+            consistent lengths even without an explicit collator.
+    """
+
+    if pad_to_max_length is None:
+        pad_to_max_length = tokenizer.model_max_length and tokenizer.model_max_length < 10**6
+
+    padding = "max_length" if pad_to_max_length else False
+    max_length = tokenizer.model_max_length if pad_to_max_length else None
 
     def _map_batch(batch: dict) -> dict:
         return tokenizer(
             batch[text_column],
-            padding="max_length",
+            padding=padding,
             truncation=True,
-            max_length=tokenizer.model_max_length,
+            max_length=max_length,
             return_attention_mask=True,
         )
 
