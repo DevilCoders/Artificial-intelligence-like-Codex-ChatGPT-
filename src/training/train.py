@@ -42,8 +42,10 @@ def _tokenize_dataset(dataset: Dataset, tokenizer, text_column: str = "text") ->
     def _map_batch(batch: dict) -> dict:
         return tokenizer(
             batch[text_column],
+            padding="max_length",
             truncation=True,
             max_length=tokenizer.model_max_length,
+            return_attention_mask=True,
         )
 
     return dataset.map(
