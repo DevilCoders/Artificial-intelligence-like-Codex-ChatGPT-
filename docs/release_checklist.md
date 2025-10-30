@@ -1,55 +1,46 @@
 # Release Checklist
 
-Use this checklist to certify each Open Source Code Corpus (OSCC) release candidate. All items must be completed or waived with
-executive approval before public or internal distribution.
+Use this checklist to validate readiness before shipping an MWRC release.
 
-## 1. Planning & scope
+## Preparation
 
-- [ ] Release scope agreed upon (languages, new repositories, enrichment features).
-- [ ] Release version assigned following `vYYYY.MM.X` pattern and recorded in change log.
-- [ ] Rollback strategy defined, including previous release restore point and communication plan.
+- [ ] Release scope approved, including domain additions/removals and schema changes.
+- [ ] Pipeline configuration (`PipelineConfig` export) committed with version tag.
+- [ ] Source registry diff reviewed by data engineering, linguists, and compliance.
+- [ ] Resource plan confirmed (compute budget, proxy capacity, storage quotas).
 
-## 2. Data readiness
+## Collection phase
 
-- [ ] Source registry updated, reviewed, and tagged for this release.
-- [ ] All ingestion pipelines completed successfully with logs archived.
-- [ ] Snapshot manifest generated with commit SHAs, timestamps, and storage URIs.
+- [ ] All crawl jobs completed successfully with retry budgets within limits.
+- [ ] Robots.txt logs reviewed; exceptions documented and approved.
+- [ ] GitHub/GitLab API usage within quota; tokens rotated post-run.
+- [ ] Vocabulary dumps verified against upstream checksums.
 
-## 3. Processing & enrichment
+## Processing & QA
 
-- [ ] Normalisation jobs passed automated validation (schema, hashing, formatting).
-- [ ] Static analysis and security scanners executed; results triaged and documented.
-- [ ] Embeddings/features generated and linked via feature-store IDs (if applicable).
+- [ ] Normalisation jobs completed; staging buckets empty except for quarantined items.
+- [ ] Deduplication metrics within thresholds (<5% duplicates remaining).
+- [ ] Language distribution validated (≥40% Russian, ≥40% English, ≤20% other).
+- [ ] Sensitive-content filters executed; manual reviews signed off.
+- [ ] Schema validation reports archived; no blocking errors outstanding.
 
-## 4. Quality assurance
+## Packaging
 
-- [ ] Quality dashboard reviewed; key metrics meet thresholds (duplicate rate, quality score, language coverage).
-- [ ] Human review samples completed with no blocking issues.
-- [ ] Regression comparison against prior release (quality deltas, new incident types) completed.
+- [ ] JSONL shards generated with deterministic naming and optional Zstandard compression.
+- [ ] Manifest created with path, record counts, byte sizes, and config snapshot.
+- [ ] Checksums (SHA-256) generated per shard and stored in release directory.
+- [ ] Sample records exported for documentation (per domain, per language).
 
-## 5. Compliance & legal
+## Compliance & documentation
 
-- [ ] License inventory reconciled; attribution packages generated and reviewed by legal.
-- [ ] Sensitive-content review completed; restricted assets labelled or removed.
-- [ ] Takedown inbox checked; outstanding requests resolved.
+- [ ] Licensing attestations compiled; attribution text verified.
+- [ ] Takedown queue reviewed; outstanding requests resolved or deferred with approval.
+- [ ] Transparency report drafted (quality metrics, known limitations, bias remediation).
+- [ ] `/docs` updates merged; change log entry drafted.
 
-## 6. Packaging & distribution
+## Launch
 
-- [ ] CSV and JSONL shards generated with deterministic naming and partitioning.
-- [ ] Checksums (`.sha256`) and signatures produced for all artefacts.
-- [ ] Release manifest validated against schema and uploaded to artefact registry.
-- [ ] Landing page/README updates prepared with new release notes.
-
-## 7. Approvals
-
-- [ ] Data engineering sign-off
-- [ ] ML engineering sign-off
-- [ ] Legal/compliance sign-off
-- [ ] Security/trust sign-off
-- [ ] Executive sponsor sign-off (required for public releases)
-
-## 8. Post-release
-
-- [ ] Monitoring alerts configured for consumer pipelines.
-- [ ] Support rota updated for launch window.
-- [ ] Retro meeting scheduled within two weeks of release.
+- [ ] Artefacts uploaded to distribution channels; permissions validated.
+- [ ] Consumers notified via mailing list/slack with summary + breaking changes.
+- [ ] Rollback plan rehearsed; previous stable release accessible.
+- [ ] Post-launch monitoring enabled (metrics dashboards, alerting rules).

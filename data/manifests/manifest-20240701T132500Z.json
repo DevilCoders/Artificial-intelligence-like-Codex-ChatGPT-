@@ -1,0 +1,16 @@
+{
+  "generated_at": "2024-07-01T13:25:00Z",
+  "release_tag": "mwrc-2024.07.0-rc1",
+  "shards": [
+    {"path": "web/web-20240701-000001.jsonl", "bytes": 1234, "records": 2},
+    {"path": "github/github-20240701-000001.jsonl", "bytes": 2345, "records": 2},
+    {"path": "gitlab/gitlab-20240701-000001.jsonl", "bytes": 2100, "records": 2},
+    {"path": "vocabulary/vocabulary-20240701-000001.jsonl", "bytes": 890, "records": 2}
+  ],
+  "config": {
+    "MWRC_BATCH_SIZE": "5000",
+    "MWRC_EMBEDDING_MODEL": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+    "MWRC_PARTITION_STRATEGY": "domain-date-shard",
+    "MWRC_COMPRESS_OUTPUT": "1"
+  }
+}

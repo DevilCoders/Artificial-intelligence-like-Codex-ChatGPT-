@@ -1,6 +1,6 @@
 # Artificial-intelligence-like-Codex-ChatGPT-
 
-An advanced custom AI model template with enhanced capabilities inspired by OpenAI Codex. This repository provides configuration and training utilities for building a large language model capable of understanding both natural language and source code across numerous programming languages.
+An advanced custom AI model template with enhanced capabilities inspired by OpenAI Codex. This repository provides configuration and training utilities for building a large language model capable of understanding both natural language and source code across numerous programming languages while pairing it with an enterprise-grade multilingual data factory.
 
 ## Features
 
@@ -9,26 +9,36 @@ An advanced custom AI model template with enhanced capabilities inspired by Open
 - **Modern architecture**: Bootstraps from high-quality open checkpoints like `bigcode/starcoderbase` and enables flash attention and gradient checkpointing for efficiency.
 - **Extensible pipeline**: Modular configuration objects let you adjust datasets, tokenizer, model, and training hyperparameters with ease.
 - **First-class text/code processing**: Built-in preprocessor, chunker, tokenizer, encoder, and decoder components make it easy to experiment with custom data prep and model architectures without leaving the template.
+- **Multilingual web and repository harvesting**: New scraping and normalization modules orchestrate web, GitHub, GitLab, and bilingual vocabulary pipelines to deliver professional-grade JSONL shards partitioned by domain.
 
 ## Repository structure
 
 ```
 src/
+  scraper/
+    config.py      # Pipeline configuration covering rate limits, partitions, and storage
+    crawlers.py    # Async crawlers for web domains, GitHub, GitLab, and vocabulary feeds
+    pipeline.py    # End-to-end orchestration, export, and manifest creation helpers
+    utils.py       # Hashing, redaction, and quality helpers shared across the pipeline
   training/
-    config.py       # Declarative configuration dataclasses (datasets, tokenizer, encoder/decoder, etc.)
-    data.py         # Dataset loading and weighting helpers
-    preprocess.py   # Normalises NL/code pairs before tokenisation
-    chunker.py      # Splits long documents into context-sized windows
-    tokenizer.py    # Byte-level BPE training utilities
-    encoder.py      # Lightweight Transformer encoder backbone
-    decoder.py      # Causal LM head and weight tying logic
-    modeling.py     # Tokenizer/model builders for pretrained + custom stacks
-    train.py        # End-to-end training orchestration (preprocess → chunk → tokenise)
+    config.py      # Declarative configuration dataclasses (datasets, tokenizer, encoder/decoder, etc.)
+    data.py        # Dataset loading and weighting helpers
+    preprocess.py  # Normalises NL/code pairs before tokenisation
+    chunker.py     # Splits long documents into context-sized windows
+    tokenizer.py   # Byte-level BPE training utilities
+    encoder.py     # Lightweight Transformer encoder backbone
+    decoder.py     # Causal LM head and weight tying logic
+    modeling.py    # Tokenizer/model builders for pretrained + custom stacks
+    train.py       # End-to-end training orchestration (preprocess → chunk → tokenise)
 docs/
-  *.md              # Dataset release playbooks, schema references, checklists
+  *.md             # Dataset release playbooks, schema references, checklists, governance
 data/
-  csv/              # Sample CSV shards illustrating terminal command records
-  jsonl/            # Sample JSONL shards mirroring CSV schema
+  jsonl/
+    web/           # Sample shards of multilingual web content
+    github/        # Sample shards of GitHub repositories
+    gitlab/        # Sample shards of GitLab repositories
+    vocabulary/    # Sample shards of bilingual vocabulary tables
+  manifests/       # Example manifest produced by the scraper pipeline
 ```
 
 ## Quickstart
@@ -39,7 +49,7 @@ data/
    pip install -U "datasets>=2.17" "transformers[torch]>=4.38" accelerate tensorboard
    ```
 
-2. **Review the default configuration**
+2. **Review the default training configuration**
 
    ```python
    from src.training.config import default_training_config
@@ -58,7 +68,52 @@ data/
 
    The default configuration interleaves GitHub code (`codeparrot/github-code`) and high-quality natural language (`the_pile`). Customize the dataset list to include additional sources, such as StackOverflow dumps or curated documentation corpora.
 
-4. **Monitoring**
+4. **Harvest multilingual corpora**
+
+   ```python
+   import asyncio
+   from pathlib import Path
+   from datetime import timedelta
+
+   from src.scraper import (
+       GitCrawlerConfig,
+       PipelineConfig,
+       RateLimit,
+       ScraperPipeline,
+       ScraperTargets,
+       VocabularySource,
+       WebsiteCrawlerConfig,
+   )
+
+   config = PipelineConfig(
+       website=WebsiteCrawlerConfig(
+           allowed_domains=("infosec.example", "linux-handbook.example"),
+           rate_limit=RateLimit(300, timedelta(minutes=1)),
+       ),
+       github=GitCrawlerConfig(
+           organisations=("opensecurity", "cloud-hardening"),
+           token_env_var="GITHUB_TOKEN",
+       ),
+       gitlab=GitCrawlerConfig(
+           organisations=("redteam-labs",),
+           token_env_var="GITLAB_TOKEN",
+       ),
+       vocabulary_sources=(
+           VocabularySource(provider="wiktionary", url="https://example.org/dump"),
+       ),
+       storage=ScraperTargets(
+           raw_root=Path("artifacts/raw"),
+           staging_root=Path("artifacts/staging"),
+           release_root=Path("artifacts/release"),
+       ),
+   )
+
+   pipeline = ScraperPipeline(config)
+   manifest_path = asyncio.run(pipeline.execute_and_export())
+   print("Exported manifest", manifest_path)
+   ```
+
+5. **Monitoring**
 
    Training logs stream to TensorBoard. Start a dashboard with:
 
@@ -80,4 +135,4 @@ This project provides a reproducible template but does **not** ship the actual t
 
 ### Dataset release toolkit
 
-The `/docs` directory now includes production-grade guidance for curating, validating, and distributing a multi-billion record open source code corpus suitable for training AI systems across application development, infrastructure, data engineering, and security workflows. Use the provided playbooks, schema reference, and release checklist to operationalise dataset builds. Sample CSV/JSONL shards in `/data` demonstrate the canonical schema, metadata richness, and partitioning strategy expected in production releases.
+The `/docs` directory now includes production-grade guidance for the Multilingual Web & Repository Corpus (MWRC)—a professional release comprising billions of multilingual website captures, GitHub/GitLab repositories, and bilingual Russian/English vocabularies. The playbooks walk through sourcing, distributed scraping, content cleaning, metadata enrichment, QA, and compliance workflows tailored for JSONL domain-partitioned shards. Sample JSONL shards under `/data/jsonl` demonstrate schema expectations, and a manifest in `/data/manifests` illustrates the delivery contract for downstream consumers.

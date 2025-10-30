@@ -1,65 +1,55 @@
-# Open Source Code Corpus Release Overview
+# Multilingual Web & Repository Corpus (MWRC) Overview
 
-This overview summarises the structure, scope, and release strategy for the Open Source Code Corpus (OSCC). The corpus targets
-billions of high-quality code examples sourced from public GitHub, GitLab, and other permissively licensed repositories so that
-data and ML engineers can train professional-grade foundation and instruction-tuned models.
+The Multilingual Web & Repository Corpus (MWRC) delivers a professional-grade release of web, GitHub, GitLab, and bilingual vocabulary content aligned to Russian and English AI training scenarios. It is engineered to scale to billions of high-quality records through automated sourcing, rigorous normalization, and comprehensive governance, enabling enterprise AI teams to build domain-specialized assistants for security operations, infrastructure engineering, and cross-lingual collaboration.
 
 ## Objectives
 
-- **Diverse coverage**: Capture popular and long-tail programming languages, frameworks, build systems, and scripting
-  environments relevant to application, infrastructure, data, and security engineering work.
-- **Production readiness**: Pair every snippet with rich metadata covering provenance, licensing, execution requirements,
-  documentation signals, and QA checkpoints required by enterprise consumers.
-- **Ethical governance**: Respect original authorship, adhere to licensing obligations, and gate potentially sensitive content
-  (e.g., secrets, malware, or exploit kits) through policy filters.
-- **Scalable refreshes**: Provide a repeatable pipeline capable of refreshing billions of records on a quarterly cadence without
-  manual intervention.
+- **Massive multilingual reach**: Capture Russian and English materials across websites, wikis, blogs, developer portals, and open-source repositories to balance cultural nuance with global engineering best practices.
+- **Domain coverage**: Track security (red/blue teaming), operations, networking, DevSecOps, and penetration-testing playbooks while incorporating neutral vocabulary corpora to ground translation models.
+- **Operational resilience**: Support continuous refreshes, automated anomaly detection, and reproducible manifests required for downstream compliance certification and auditability.
+- **Ethical governance**: Respect robots.txt, licensing, takedown requests, and sensitive-content policies while providing transparent provenance metadata.
 
 ## Deliverables
 
-1. **Dataset shards** produced in CSV and JSONL formats, split into deterministic multi-gigabyte files (e.g.,
-   `code-000001.jsonl.zst`) with manifest and checksum files.
-2. **Schema definitions** describing the canonical field contract, enumerations, and optional enrichments used across formats.
-3. **Ingestion & processing pipeline** assets (jobs, configs, notebooks) to reproduce the corpus from raw mirrors and new
-   candidate repositories.
-4. **Quality, evaluation, and compliance reports** demonstrating license validation, deduplication, static analysis results,
-   and release gating decisions.
-5. **Release documentation** (this directory) that enables downstream teams to operate, audit, and extend the corpus.
+1. **Domain-partitioned JSONL shards** with deterministic naming (`<domain>/<domain>-<shard>.jsonl[.zst]`) including hash digests and per-record metadata such as license, language, quality scores, and crawl timestamps.
+2. **Manifest and lineage artifacts** providing checksums, record counts, generation parameters, and upstream mirrors for every release cut.
+3. **Scraper orchestration assets** (configuration dataclasses, async crawlers, pipeline runner) capable of reproducing the corpus across distributed workers and cloud regions.
+4. **Cleaning and enrichment playbooks** detailing HTML parsing, code extraction, bilingual alignment, translation heuristics, deduplication, and safety filters.
+5. **Quality, compliance, and release documentation** summarizing validation metrics, policy waivers, incident responses, and launch readiness decisions.
 
 ## Release milestones
 
 | Milestone | Description | Exit criteria |
 |-----------|-------------|---------------|
-| Source registry | Curate allow-listed organisations, repositories, and mirrors; snapshot commit ranges. | Registry stored in configuration repo with licensing metadata and sync automation. |
-| Normalisation | Convert raw files into canonical records with consistent metadata, formatting, and snippet extraction. | Validation suite passes, schema contracts satisfied, canonical hashes produced. |
-| Enrichment | Add embeddings, tests, language/tool tags, dependency manifests, and code intelligence signals. | Coverage thresholds met (>95% records with language, license, and quality metrics). |
-| Compliance | Execute legal, privacy, and security reviews; log waivers. | No blocking issues; approved distribution scope stored in release dossier. |
-| Packaging | Publish release candidate shards, manifests, and checksums to artefact registry. | Release candidate signed, integrity verified, and immutably stored. |
-| Documentation | Finalise `/docs` playbooks, public release notes, and landing page. | Documentation review sign-off completed and archived. |
+| Source discovery | Curate allow-listed domains, organizations, mirrors, and vocabulary datasets with licensing clearance. | Source registry published with license classification, contact routes, and automated freshness checks. |
+| Crawl orchestration | Execute distributed scrapers with adaptive rate limiting, rotating proxies, and failure recovery. | 99.5% job success, SLA-compliant response times, and automated retry exhaustion reporting. |
+| Normalisation & enrichment | Convert raw artifacts to canonical JSONL records with language tags, dedup hashes, embeddings, and quality scores. | Schema validation passes; >98% records with language detection confidence ≥0.9; dedup ratio <5%. |
+| Compliance review | Run privacy, security, and legal reviews including manual sampling of high-risk segments. | Compliance sign-off stored in release dossier; takedown workflow rehearsed. |
+| Packaging & distribution | Produce signed manifests, publish shards to artefact registry, and notify downstream teams. | Integrity checks succeed; release notes and checksums available via catalog; rollback plan tested. |
+| Documentation & enablement | Finalize `/docs` playbooks, consumer onboarding guides, and dataset change log. | Documentation approved by data governance; enablement session delivered to ML platform teams. |
 
 ## Stakeholders
 
-- **Data engineering**: Own ingestion, transformation, storage, and refresh automation.
-- **ML engineering**: Define downstream consumption requirements, provide schema feedback, and benchmark releases.
-- **Developer relations**: Coordinate with upstream communities and communicate attribution requirements.
-- **Legal & compliance**: Approve licensing, distribution rights, and data retention policies.
-- **Security & trust**: Operate sensitive-content classifiers, monitor misuse, and respond to takedown requests.
+- **Data engineering**: Own orchestrator implementation, cloud infrastructure, and pipeline observability.
+- **ML engineering**: Provide schema feedback, evaluate dataset quality, and integrate with pretraining/finetuning workflows.
+- **Localization linguists**: Review bilingual alignment quality, lexicon coverage, and cultural nuance for Russian ↔ English content.
+- **Security & trust**: Operate sensitive-content classifiers, manage exploit/zero-day policies, and steward takedown responses.
+- **Legal & compliance**: Validate licensing, export controls, and regional data-residency requirements.
 
 ## Versioning strategy
 
-- Tag public releases using year.month.sequence semantics (e.g., `v2024.07.0`).
-- Maintain a change log enumerating new sources, schema changes, and quality improvements.
-- Provide patch releases for urgent fixes and delta manifests describing added/removed shards.
+- Tag public releases as `mwrc-YYYY.MM.iteration` (e.g., `mwrc-2024.07.0`).
+- Maintain semantic change logs capturing new domains, schema migrations, policy updates, and major quality deltas.
+- Offer delta manifests for hotfix builds and maintain `LATEST` pointers for automated consumers.
 
 ## Distribution channels
 
-- Primary: internal artefact registry (S3, GCS, Azure Blob, or self-hosted object storage) with signed manifests.
-- Secondary: optional mirrors on academic or industry dataset hubs; always include attribution and usage guidelines.
-- Ensure network egress budgets and API quota considerations for downstream continuous-training consumers.
+- Primary: internal object storage (S3/GCS/Azure Blob) with immutability, signed URLs, and inventory exports.
+- Secondary: curated research mirrors (e.g., academic partnerships) with scoped subsets and rate-limit controls.
+- Optional: sanitized subsets for public evaluation hosted via Hugging Face Datasets or Open Data portals.
 
 ## Support & maintenance
 
-- Establish quarterly refresh cadence with automated anomaly detection for licensing drift, quality regressions, and duplicate
-  rates.
-- Maintain on-call rotations and runbooks for ingestion failures, security escalations, and takedown requests.
-- Track consumer issues through ticketing system with defined SLAs and publish quarterly health reviews.
+- Run continuous monitoring on crawl throughput, dedup ratios, translation accuracy, and safety classifier drift.
+- Provide on-call coverage for ingestion failures and data-quality regressions with documented runbooks.
+- Publish quarterly health reports, consumer satisfaction surveys, and roadmap updates.

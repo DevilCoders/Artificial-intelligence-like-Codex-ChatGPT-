@@ -1,90 +1,86 @@
 # Schema Reference
 
-This document defines the canonical record schema for the Open Source Code Corpus (OSCC). Maintain versioned copies of this
-schema and increment semantic version numbers when breaking changes occur.
+The MWRC JSONL schema ensures consistent metadata across domains while allowing domain-specific enrichments.
 
-## Core fields
+Each JSONL line is a UTF-8 encoded JSON object. Top-level fields:
 
-| Field | Type | Description | Required |
-|-------|------|-------------|----------|
-| `record_id` | `string` | Globally unique identifier (UUIDv7 recommended). | Yes |
-| `repository_host` | `string` | Hosting provider (`github`, `gitlab`, `bitbucket`, `mirror`). | Yes |
-| `repository` | `string` | Canonical `<owner>/<name>` identifier. | Yes |
-| `source_url` | `string` | Permanent URL to the file or snippet (commit permalink). | Yes |
-| `commit_sha` | `string` | 40-character Git commit SHA representing the snapshot. | Yes |
-| `file_path` | `string` | Relative path to file within repository. | Yes |
-| `programming_language` | `string` | Primary language of the snippet (ISO 639-2 or GitHub Linguist names). | Yes |
-| `license_spdx` | `string` | SPDX identifier resolved for this snippet. | Yes |
-| `license_status` | `string` | Enum: `approved`, `restricted`, `waived`. | Yes |
-| `snippet` | `string` | Canonical code block used for training. | Yes |
-| `start_line` | `int32` | Starting line number of the snippet within the file. | No |
-| `end_line` | `int32` | Ending line number of the snippet within the file. | No |
-| `docstring` | `string` | Associated docstring or comment providing natural-language context. | No |
-| `documentation_urls` | `array[string]` | Links to documentation, READMEs, or blog posts referencing the snippet. | No |
-| `tags` | `array[string]` | Taxonomy tags (language features, frameworks, domains). | No |
-| `task_type` | `string` | High-level task classification (`web.backend`, `ml.training`, etc.). | Yes |
-| `quality_score` | `float32` | Composite quality score (0–1) derived from validation pipeline. | Yes |
-| `tests_passed` | `boolean` | Indicates whether associated tests/notebooks executed successfully. | No |
-| `test_status_notes` | `string` | Additional detail for `tests_passed=false` cases. | No |
-| `risk_classification` | `string` | Enum: `standard`, `security_sensitive`, `restricted`. | Yes |
-| `safety_tags` | `array[string]` | Flags for safety filtering (e.g., `contains_exploit`, `pii_redacted`). | No |
-| `collection_date` | `date` | ISO-8601 date when snippet was ingested. | Yes |
-| `last_reviewed` | `date` | Date of latest human or automated review. | No |
-| `validation_status` | `string` | Enum: `passed`, `failed`, `waived`. | Yes |
-| `validation_report` | `string` | Link to detailed QA findings. | No |
-| `dedupe_hash` | `string` | SHA-256 hash of normalised snippet + provenance fields. | Yes |
-| `embedding_vector` | `array[float32]` | Optional vector ID or inline embedding; store externally where possible. | No |
-| `ingestion_pipeline` | `string` | Identifier for pipeline configuration/version used during processing. | Yes |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | ✓ | Deterministic UUID or hash representing the record. Typically derived from `hash` in `src.scraper.utils`. |
+| `domain` | string | ✓ | Logical partition (`web`, `github`, `gitlab`, `vocabulary`). |
+| `url` | string | ✓ | Canonical URL or repository identifier. |
+| `language` | string | ✓ | ISO-639-1 or composite code (`ru`, `en`, `ru-en`). |
+| `text` | string | ✓ | Cleaned textual content ready for model ingestion. |
+| `tokens` | integer | ✓ | Token count computed using release-approved tokenizer. |
+| `license` | string | ✓ | SPDX identifier or `custom:<slug>` when no SPDX equivalent exists. |
+| `source_metadata` | object | ✓ | Provenance details (see below). |
+| `quality` | object | ✓ | Quality metrics (per-domain). |
+| `safety` | object | ✓ | Safety classifier outputs and redaction markers. |
+| `embeddings` | object | ✗ | Optional vector references (e.g., path to embedding artefact). |
+| `alignment` | object | ✗ | Bilingual alignment payload for vocabulary entries. |
 
-## File formats
+## `source_metadata`
 
-### CSV
+Common keys:
 
-- Use UTF-8 encoding with Unix line endings.
-- Represent arrays as pipe-delimited strings (`tag1|tag2`).
-- Escape embedded quotes by doubling them. Provide header row.
-- Compress shards with `gzip` or `zstd`; include `.sha256` checksum files and optional `.sig` signatures.
+- `retrieved_at` (string, ISO-8601)
+- `crawl_run_id` (string)
+- `source` (string, e.g., hostname or repository slug)
+- `commit_sha` (string, Git domains only)
+- `branch` (string, Git domains only)
+- `author` (string, when available)
+- `attribution` (string, human-readable attribution statement)
 
-### JSONL
+## `quality`
 
-- One JSON object per line, encoded in UTF-8.
-- Use snake_case for field names (`documentation_urls`, `tests_passed`).
-- Omit null fields to reduce file size; consumers must handle missing keys.
-- Ensure numbers maintain appropriate precision (use `float32` for quality scores, `int32` for line numbers).
+Common keys:
 
-## Manifest specification
+- `readability` (float 0-1)
+- `toxicity` (float 0-1, lower is safer)
+- `domain_specific` (object) capturing classifier outputs, e.g., `security_relevance`
+- `dedupe_rank` (integer) referencing dedupe cluster ordering
 
-Each release must ship a manifest file (JSON or YAML) describing shard contents, integrity, and governance metadata. Example:
+## `safety`
 
-```json
-{
-  "dataset_name": "open-source-code-corpus",
-  "schema_version": "1.1.0",
-  "release": "v2024.07.0",
-  "record_count": 1250000000,
-  "file_formats": ["csv", "jsonl"],
-  "shards": [
-    {
-      "path": "csv/code-000001.csv.zst",
-      "records": 7500000,
-      "size_bytes": 268435456,
-      "checksum": "sha256:..."
-    },
-    {
-      "path": "jsonl/code-000001.jsonl.zst",
-      "records": 7500000,
-      "size_bytes": 335544320,
-      "checksum": "sha256:..."
-    }
-  ],
-  "quality_report": "reports/quality-v2024.07.0.html",
-  "compliance_report": "reports/compliance-v2024.07.0.pdf"
-}
-```
+Common keys:
 
-## Schema change management
+- `pii_flag` (boolean)
+- `pii_detectors` (array of strings) listing triggered detectors (empty if `false`)
+- `security_tier` (string: `public`, `sensitive`, `restricted`)
+- `redactions` (array of objects with `pattern` and `replacement`)
 
-- Propose changes through architecture decision records (ADRs) with downstream impact analysis.
-- Provide migration guides and backward-compatible views (e.g., SQL views, transformation scripts) for at least two release
-  cycles.
-- Version schema definitions in source control and publish change logs alongside release notes.
+## Domain-specific extensions
+
+### Web (`domain = "web"`)
+
+- `source_metadata.site_category` (e.g., `documentation`, `blog`, `forum`)
+- `quality.page_depth` (integer)
+- `quality.language_confidence` (float 0-1)
+
+### GitHub/GitLab (`domain in {"github", "gitlab"}`)
+
+- `source_metadata.repo_topics` (array of strings)
+- `source_metadata.file_path` (string)
+- `source_metadata.license_path` (string)
+- `quality.code_language` (string, programming language detection)
+- `quality.tests_present` (boolean)
+- `safety.security_finding` (string, optional manual triage notes)
+
+### Vocabulary (`domain = "vocabulary"`)
+
+- `alignment.source_tokens` (array of strings, Russian)
+- `alignment.target_tokens` (array of strings, English)
+- `alignment.part_of_speech` (string, e.g., `noun`, `verb`)
+- `quality.frequency_bucket` (string: `common`, `specialised`, `rare`)
+
+## File layout
+
+- Shards are stored as `jsonl/<domain>/<YYYY>/<MM>/<domain>-<YYYYMMDD>-<shard>.jsonl` and optionally `.jsonl.zst` if compression enabled.
+- Each release includes `jsonl/<domain>/LATEST` symlink or pointer file referencing the newest shard set.
+- Manifests live in `manifests/manifest-<timestamp>.json` referencing shards with relative paths.
+
+## Schema management
+
+- Schema changes follow semantic versioning. Store JSON Schema drafts in `schemas/mwrc-v<major>.<minor>.json` (not yet included by default).
+- Provide migration scripts for downstream consumers when removing or renaming fields.
+- Unit tests in CI validate sample shards against the JSON Schema to prevent regressions.

@@ -1,65 +1,39 @@
 # Data Collection Pipeline
 
-This playbook documents how to source and maintain the Open Source Code Corpus (OSCC), targeting billions of code examples across
-GitHub, GitLab, community mirrors, and documentation portals. The pipeline emphasises reproducibility, compliance, and scale.
+This guide details the end-to-end ingestion process for the Multilingual Web & Repository Corpus (MWRC). The pipeline is designed to crawl billions of records from websites, GitHub, GitLab, and bilingual vocabulary sources while enforcing governance controls and maintaining reproducibility.
 
-## 1. Source discovery & registry
+## Architecture overview
 
-1. **Seed allow-list**: Start with permissively licensed organisations (Apache, MIT, BSD, CC-BY) and high-signal repositories
-   (official SDKs, security tooling, infrastructure-as-code, research implementations).
-2. **Metadata harvesting**: Use platform APIs (GitHub, GitLab), BigQuery GH Archive, and curated lists to collect repository
-   metadata: stars, primary language, topics, forks, license, archival status.
-3. **Risk scoring**: Apply heuristics to exclude repositories with malware, leaked secrets, personal data, or restrictive
-   licenses. Maintain risk justification logs for each decision.
-4. **Registry store**: Persist the allow-list in version-controlled configuration (YAML/JSON) with the following fields:
-   repository URL, host, default branch, release tags to mirror, license status, refresh cadence, and attribution contacts.
+1. **Source registry**: Central YAML registry enumerating approved domains, repositories, API endpoints, authentication scopes, and licensing status. Updated via pull requests with automated linting for ownership, contact email, and compliance tags.
+2. **Distributed scheduler**: Kubernetes or Airflow orchestrates scrape jobs using the configuration exported by `src.scraper.config.PipelineConfig`. Jobs are sharded by domain and geographic region to respect data residency.
+3. **Async crawlers**: Custom asyncio-based workers (`WebsiteCrawler`, `GitHubCrawler`, `GitLabCrawler`, `VocabularyCrawler`) execute HTTP requests with adaptive rate limits, rotating proxies, and per-source retry policies.
+4. **Raw storage**: Unprocessed responses (HTML, Markdown, repository archives, vocabulary tables) are persisted in object storage using deterministic keys (`raw/<source>/<YYYY>/<MM>/<DD>/<uuid>.json`).
+5. **Metadata broker**: Kafka topics capture crawl telemetry (request counts, HTTP status, bytes transferred, robots decisions) to power dashboards and anomaly detection.
+6. **Checkpointing**: Every worker emits checkpoint files after configurable intervals (`PipelineConfig.checkpoint_interval`) to enable resumable crawls in case of failure.
 
-## 2. Mirroring & snapshotting
+## Key capabilities
 
-1. **Bulk cloning**: Use distributed workers with git partial clone or sparse checkout to mirror repositories respecting API
-   limits. Schedule jobs via orchestration (Airflow, Dagster, Prefect).
-2. **Immutable storage**: Store bare mirrors in object storage with versioned folders `mirror/<host>/<owner>/<repo>/<commit>/`.
-3. **Snapshot selection**: Choose release tags or commit ranges per repository. Record commit SHAs, snapshot timestamps, and
-   manifest entries for reproducibility.
-4. **Event hooks**: Subscribe to webhooks or release feeds for high-priority repositories to trigger incremental syncs.
+- **Robots.txt and sitemap awareness**: Workers fetch robots.txt before scraping and ingest sitemaps when available. Non-compliant paths are skipped and logged to the compliance report.
+- **Credential isolation**: GitHub/GitLab tokens are injected via `token_env_var` and rotated automatically using secret managers. Vocabulary sources requiring API keys are scoped to read-only privileges.
+- **Adaptive throttling**: Rate limits are enforced using token-bucket semantics defined in `RateLimit`. Workers monitor latency and failure rates to back off proactively when encountering stress indicators.
+- **Content negotiation**: Web crawlers negotiate HTML/JSON/Markdown based on domain preferences, while repo crawlers clone default branches and optionally fetch PR diffs for knowledge of active development.
+- **Language prioritisation**: Seeds emphasise Russian and English entry points; heuristics expand to linked pages when language classifiers predict high confidence for target locales.
+- **Attribution logging**: Every request stores headers, source license, and upstream attribution statements to satisfy open-source requirements during release.
 
-## 3. Candidate extraction
+## Scaling strategy
 
-1. **File selection**: Filter mirrored content using language detection, file extensions, and maximum file size thresholds.
-2. **Sensitive content filtering**: Run scanners for credentials, secrets, personally identifiable information, and regulated
-   data. Flag and quarantine hits for manual review.
-3. **Security posture**: Detect and classify offensive security artifacts (exploits, malware). Route to security review for
-   policy gating before inclusion.
+- Launch hundreds of concurrent pods across multiple regions, pinning web crawlers close to target domains to minimise latency and respect geopolitical constraints.
+- Use queue-based load balancing to assign new crawl tasks only after previous shards emit checkpoints, preventing overload of smaller domains.
+- Mirror high-volume repositories using git alternates and partial clones to reduce redundant bandwidth.
 
-## 4. Snippet generation
+## Failure handling
 
-1. **Chunking**: Segment files into function-level or logical code blocks using tree-sitter, AST parsers, or heuristic
-   delimiters. Capture surrounding context (imports, class definitions) where relevant.
-2. **Documentation pairing**: Link code with inline comments, README excerpts, and official documentation to provide context for
-   training tasks.
-3. **Metadata capture**: Record language, repository path, line ranges, commit SHA, dependency manifests, and build/test status
-   when available.
-4. **Canonical hashing**: Generate SHA-256 hashes on normalised snippets (whitespace-trimmed, comment-normalised) to deduplicate
-   across repositories and releases.
+- Automatic retries with exponential backoff for transient failures, capped at 5 attempts.
+- Circuit breakers triggered by HTTP 429/5xx bursts pause scraping for that domain and alert operators.
+- Persistent failures or legal blocks (HTTP 451) are escalated to compliance with full request/response logging.
 
-## 5. Ingestion orchestration
+## Reproducibility
 
-1. **Workflow engine**: Orchestrate the above steps via DAGs with idempotent tasks and checkpointing.
-2. **Observability**: Emit metrics (throughput, errors, dedupe rates), structured logs, and lineage metadata to a central
-   catalogue (e.g., OpenLineage, Marquez).
-3. **Failure handling**: Implement retries with exponential backoff, dead-letter queues for problematic repositories, and
-   automated issue creation for manual remediation.
-
-## 6. Refresh cadence
-
-- **Quarterly full refresh**: Rebuild the corpus from the latest allow-listed snapshots, tracking drift in license or repository
-  status.
-- **Monthly deltas**: Process incremental commits for high-signal repositories and publish delta shards with compatibility
-  manifests.
-- **Urgent patches**: Provide out-of-band updates for takedown requests, security incidents, or schema adjustments.
-
-## 7. Documentation & audit
-
-- Maintain diagrams of ingestion architecture, data lineage, and dependency graphs.
-- Store audit evidence (API request logs, license approvals, takedown responses) for at least two years.
-- Publish postmortems for major incidents and capture follow-up actions in the runbook backlog.
+- Pipeline configurations and source registries are versioned and tagged alongside each release.
+- Crawl jobs emit deterministic JSON summaries describing commit hashes, dependency versions, and environment variables derived from `PipelineConfig.export_env()`.
+- Raw artifacts are immutable; reprocessing uses snapshot pointers to guarantee repeatable normalization and training data builds.

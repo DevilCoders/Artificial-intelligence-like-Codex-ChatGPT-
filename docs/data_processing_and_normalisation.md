@@ -1,68 +1,57 @@
 # Data Processing & Normalisation
 
-This guide outlines how to transform mirrored repositories into high-quality records aligned with the Open Source Code Corpus
-(OSCC) schema. The processing pipeline scales to billions of snippets by leveraging distributed compute, deterministic
-normalisation, and rigorous tracking.
+This playbook outlines the processing stages that transform raw MWRC crawls into clean, domain-partitioned JSONL shards suitable for large-scale AI training.
 
-## 1. Preparation
+## Pipeline stages
 
-1. **Input manifest**: Consume the source registry produced during data collection. Each entry must include repository host,
-   commit SHA or tag, license, and ingestion priority.
-2. **Processing configuration**: Parameterise jobs with language-specific extractors, maximum snippet lengths, comment handling
-   policies, and build/test execution toggles.
-3. **Environment isolation**: Run transformations inside sandboxed containers with pinned dependencies to ensure reproducibility.
+1. **Ingestion staging**
+   - Raw artifacts flow into `/staging/<domain>/<timestamp>/<uuid>.json`.
+   - Metadata includes request headers, crawl run identifier, HTTP status, byte counts, and robots decisions.
+   - Staging validations confirm UTF-8 encoding, gzip integrity, and schema compatibility before processing.
 
-## 2. Parsing & extraction
+2. **Parsing & extraction**
+   - HTML documents are parsed with Readability-style boilerplate removal and CSS/JS stripping.
+   - Repository assets are processed using tree parsers that extract readme files, code snippets, commit metadata, and security advisories as separate payloads.
+   - Vocabulary dumps are normalised to two-column CSV internally before JSONL conversion to simplify deduplication.
 
-1. **Language detection**: Use tree-sitter or linguist-derived heuristics to confirm declared languages and override ambiguous
-   file types.
-2. **AST-based chunking**: Traverse abstract syntax trees to extract functions, classes, and relevant blocks. Capture the
-   minimal context required for readability (imports, docstrings, type hints).
-3. **Docstring & comment capture**: Preserve docstrings, comments, and README references that explain the snippet's purpose or
-   usage.
-4. **Context linking**: Attach surrounding metadata such as dependency files, tests, or configuration snippets that reference the
-   code block.
+3. **Language identification**
+   - FastText or CLD3-based detectors classify text. Records with probability <0.8 for Russian or English are quarantined for manual review.
+   - Bilingual vocabulary records store both `ru` and `en` tokens; longer sentences undergo translation consistency checks using bilingual embeddings.
 
-## 3. Normalisation
+4. **Cleaning & enrichment**
+   - Whitespace normalisation, Unicode NFC enforcement, and punctuation smoothing.
+   - Redaction of secrets, credentials, or PII using regex patterns from `PipelineConfig.redact_patterns` and `PipelineConfig.pii_detectors`.
+   - Token counts, readability scores, and domain-specific quality scores (e.g., security playbook classifier) are appended to metadata.
+   - License classifiers predict SPDX IDs when missing, cross-checked against source registry hints.
 
-1. **Whitespace & formatting**: Normalise indentation, line endings, and trailing whitespace while respecting language-specific
-   conventions.
-2. **Encoding**: Enforce UTF-8 encoding and replace non-printable characters with escapes.
-3. **Secret scrubbing**: Redact detected secrets with placeholder tokens and attach remediation notes in metadata.
-4. **License propagation**: Resolve repository- and file-level licenses; inherit or override according to SPDX metadata.
-5. **Attribution fields**: Populate repository owner, project name, commit hash, and source URLs for each record.
-6. **Hashing**: Generate canonical `dedupe_hash` values on the cleaned snippet plus key metadata.
+5. **Deduplication**
+   - SHA-256 hashes computed over URL + text pairs (`compute_record_hash`) underpin near-exact dedupe windows.
+   - MinHash + locality-sensitive hashing run across embeddings to flag semantic near-duplicates, with heuristics to retain the highest-quality exemplar per cluster.
+   - Dedup decisions (retain/drop + reason) are logged for traceability.
 
-## 4. Enrichment
+6. **Alignment & structuring**
+   - Content is mapped into canonical schema fields (see `schema_reference.md`).
+   - Domain partition keys follow `<domain>/<YYYY>/<MM>/<DD>/<shard>.jsonl[.zst]` to facilitate incremental refreshes.
+   - Vocabulary lines include explicit alignment arrays for bilingual data when available.
 
-1. **Static analysis**: Run linters, formatters, and security scanners (Bandit, Semgrep, ESLint, gosec) to generate quality and
-   risk signals.
-2. **Execution metadata**: For repositories with tests/examples, execute targeted test suites or notebook cells inside secure
-   sandboxes; record success/failure and logs.
-3. **Embedding generation**: Produce language model embeddings for semantic search and curriculum design; store vectors in
-   separate feature stores referenced via IDs.
-4. **Taxonomy tagging**: Map snippets to task ontologies (e.g., `web.backend`, `ml.training`, `iac.terraform`, `sec.exploit`) and
-   cross-reference with framework/library tags.
+7. **Validation**
+   - JSON schema validation ensures field presence, type correctness, and allowed enumerations.
+   - Language-specific validators verify Cyrillic-to-Latin ratio thresholds to avoid mislabelled entries.
+   - Size checks enforce minimum character length per domain (web ≥256 chars, repos ≥80 chars per file snippet).
 
-## 5. Validation & checks
+8. **Export & manifesting**
+   - Clean records stream into JSONL writers grouped by domain and date, optionally compressed with Zstandard.
+   - Manifest builder captures shard paths, record counts, byte sizes, dedupe ratios, and processing parameters.
+   - Release candidate metadata and quality metrics are signed and uploaded to the artefact registry alongside shards.
 
-1. **Schema validation**: Enforce schema contracts using tools like Great Expectations or pydantic models.
-2. **Deduplication**: Identify and collapse duplicates within and across repositories using canonical hashes, fuzzy matching, and
-   similarity search.
-3. **Quality scoring**: Combine static analysis, test pass rates, documentation coverage, and code review heuristics into a
-   composite quality score per record.
-4. **Manual review**: Sample high-risk categories (security, cryptography, low-quality) for subject-matter expert review and
-   capture adjudication outcomes.
+## Tooling
 
-## 6. Output formatting
+- Python-based processors in `src.scraper.pipeline` orchestrate post-processing, leveraging asynchronous IO for throughput.
+- Spark or Ray jobs can be attached during enrichment to compute embeddings or domain-specific classifiers at scale.
+- Great Expectations suites enforce schema constraints, while Marquez/OpenLineage captures data lineage.
 
-1. **Partitioning**: Write records into deterministic shards (e.g., 5–10M records per file) with balanced language distribution.
-2. **Compression & checksums**: Compress outputs with `zstd` or `gzip`, generate SHA-256 checksums, and sign manifests.
-3. **Metadata sidecars**: Produce auxiliary files containing statistics (language breakdown, license mix, quality distributions)
-   and processing lineage.
+## Operational notes
 
-## 7. Observability & lineage
-
-- Emit structured logs for every record, capturing pipeline stage, duration, success/failure, and error messages.
-- Populate a central lineage catalogue linking source commits to output shards and validation artefacts.
-- Store pipeline configurations and container images with content-addressable identifiers for reproducibility audits.
+- Maintain replay logs enabling deterministic reprocessing from any checkpoint.
+- Quarantine buckets hold rejected or policy-blocked items for remediation.
+- End-to-end latency target: <12 hours from crawl completion to release-candidate packaging for standard refresh cycles.

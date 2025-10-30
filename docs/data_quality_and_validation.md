@@ -1,59 +1,56 @@
-# Data Quality & Validation Strategy
+# Data Quality & Validation
 
-This guide defines the validation framework used to ensure the Open Source Code Corpus (OSCC) meets enterprise-grade standards
-before release. The strategy combines automated checks, sampling, and governance workflows to manage billions of records.
+A rigorous validation program ensures MWRC releases maintain accuracy, completeness, and safety across domains.
 
-## 1. Quality principles
+## Quality pillars
 
-- **Accuracy**: Snippets reflect actual source content at a specific commit and include faithful metadata.
-- **Completeness**: Required schema fields are populated; optional enrichments have target coverage thresholds.
-- **Consistency**: Formatting, encoding, and taxonomy assignments are uniform across shards and releases.
-- **Safety**: Harmful or sensitive content is filtered or flagged with appropriate risk labels.
-- **Traceability**: Every record links back to source commits, processing jobs, and validation artefacts.
+1. **Completeness**
+   - Track crawl coverage vs. target seeds with dashboards showing % of allow-listed pages retrieved.
+   - Monitor repository clone success rates, branch coverage, and documentation extraction ratios.
+   - Ensure vocabulary feeds include all required lemma classes and part-of-speech tags.
 
-## 2. Automated validation pipeline
+2. **Correctness**
+   - Run deterministic schema validation on every JSONL shard.
+   - Perform language detection audits using stratified sampling (Russian-only, English-only, bilingual) with manual verification.
+   - Compare repository hashes against upstream commit SHAs to catch truncated downloads.
 
-1. **Schema conformance**: Validate each record with strict schema contracts (e.g., Great Expectations, `pandera`, custom Rust
-   validators). Reject or quarantine non-compliant rows.
-2. **License verification**: Confirm SPDX identifiers against allow-lists, cross-check with repository license files, and flag
-   conflicts for manual review.
-3. **Deduplication metrics**: Calculate intra- and inter-release duplicate ratios using canonical hashes and MinHash-based
-   similarity search. Set alert thresholds (<1% duplicates per release).
-4. **Static analysis scores**: Ingest linter and security scanner outputs; enforce minimum quality thresholds by language and
-   framework.
-5. **Execution validation**: Where feasible, run tests or notebooks associated with snippets; capture exit codes, runtime, and
-   logs. Require >90% pass rate for curated gold subsets.
-6. **Content safety**: Apply classifiers for PII, secrets, malware, extremism, and hate speech. Block or redact flagged content
-   and log remediation.
+3. **Consistency**
+   - Validate domain-level quality scores remain within expected ranges across releases (e.g., readability, toxicity, vulnerability classifier output).
+   - Ensure dedupe ratios remain stable; spikes trigger drift investigations.
+   - Confirm manifests accurately reflect shard byte sizes and record counts by re-computing checksums.
 
-## 3. Sampling & human review
+4. **Timeliness**
+   - Validate that >90% of records originate within freshness SLAs (web ≤90 days old, repositories synced weekly, vocabularies monthly).
+   - Track pipeline latency from crawl to release; deviations >10% raise alerts.
 
-1. **Stratified sampling**: Sample by language, license, repository host, and quality score decile. Adjust sample rates based on
-   risk appetite and historical incident patterns.
-2. **Expert review**: Assign samples to domain experts (language specialists, security analysts). Provide review forms capturing
-   accuracy, safety, documentation quality, and suggested actions.
-3. **Escalation workflow**: Route disputed records to governance board meetings for final decision, documenting outcomes in the
-   release dossier.
+5. **Safety & compliance**
+   - Run sensitive-content classifiers (malware, exploit kits, PII) on every batch with automatic quarantining.
+   - Manual review quotas for high-risk domains ensure policy enforcement and human oversight.
 
-## 4. Metrics & dashboards
+## Validation workflow
 
-- **Coverage metrics**: Language coverage, license mix, attribution completeness, enrichment coverage.
-- **Quality indices**: Mean quality score, static analysis pass rate, test pass rate, documentation density.
-- **Operational metrics**: Processing throughput, validation runtime, error counts, backlog age.
-- **Safety metrics**: Sensitive-content hit rate, false-positive rate, remediation turnaround time.
+1. **Automated checks**
+   - Great Expectations suites enforce schema, enumerations, and range constraints.
+   - Embedding-based similarity checks flag potential duplicates or off-domain content for manual adjudication.
+   - Language drift monitors compare distribution of tokens between releases.
 
-Publish dashboards in analytics tooling (e.g., Looker, Metabase, Superset) and include snapshots in release notes.
+2. **Human-in-the-loop review**
+   - Curated stratified samples across domains, languages, and quality scores are assigned to bilingual reviewers.
+   - Review outcomes feed into calibration dashboards measuring precision/recall of automated filters.
 
-## 5. Release gating
+3. **Sign-off gates**
+   - Data engineering signs off on infrastructure health and dedup metrics.
+   - Linguists approve bilingual accuracy and vocabulary coverage.
+   - Compliance validates policy adherence, licensing, and takedown log completeness.
 
-1. **Go/no-go checklist**: Ensure critical metrics exceed thresholds defined in release playbooks (see `release_checklist.md`).
-2. **Sign-offs**: Require approvals from data engineering, ML engineering, legal/compliance, and security leads.
-3. **Issue tracking**: Capture all release-blocking issues in the tracker; document waivers with expiration dates and owners.
-4. **Post-release monitoring**: Instrument telemetry to detect downstream issues (API error rates, consumer feedback) and trigger
-   remediation workflows.
+## Monitoring & alerting
 
-## 6. Continuous improvement
+- Metrics exported to Prometheus/Grafana track crawl success, dedupe ratios, classifier drift, and validation SLA compliance.
+- PagerDuty or Opsgenie alerts trigger when critical metrics breach thresholds (e.g., dedupe ratio >10%, toxicity classifier recall <0.85).
+- Monthly postmortems review incidents, annotate root causes, and update playbooks.
 
-- Conduct quarterly retrospectives on validation incidents and update heuristics accordingly.
-- Maintain a backlog of validation rules to automate based on human-review findings.
-- Share learnings with upstream open-source communities and incorporate feedback into sourcing policies.
+## Reporting
+
+- Publish release scorecards summarizing quality metrics, outstanding risks, and change highlights.
+- Maintain historical dashboards to compare releases and support anomaly detection.
+- Provide consumer-facing quality notes detailing known limitations, blocked domains, or schema changes.
