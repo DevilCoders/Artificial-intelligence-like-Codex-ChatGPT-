@@ -1,0 +1,11 @@
+record_id,command,category,platform,source_url,license,tags,description
+1,"nmap -sV -Pn 10.0.0.0/24",Reconnaissance,Linux,https://github.com/example/sec-tools,MIT,"security,network","Service and version detection scan across internal subnet with host discovery disabled"
+2,"Invoke-WebRequest -Uri https://example.com -OutFile report.html",Data Collection,Windows,https://gist.github.com/example/powershell,MIT,"windows,powershell","Download HTML report over HTTPS for offline review"
+3,"sudo fs_usage | grep -i malware",Threat Hunting,macOS,https://gitlab.com/example/macos-scripts,Apache-2.0,"macos,monitoring","Inspect real-time filesystem operations for suspicious activity"
+4,"grep -R ""Failed password"" /var/log/auth.log",Blue Team,Linux,https://example.com/blog/blue-team,CC-BY-4.0,"log-analysis,auth","Identify authentication failures for correlation rules"
+5,"sqlmap -u https://example.org/search.php?query=1 --batch",Red Team,Linux,https://github.com/sqlmapproject/sqlmap,GPL-2.0,"web,sql-injection","Automated SQL injection testing with non-interactive prompts"
+6,"Get-WinEvent -FilterHashtable @{LogName='Security';ID=4625}",Blue Team,Windows,https://learn.microsoft.com/windows/,MS-EULA,"windows,event-log","Query failed Windows login events for intrusion detection"
+7,"chmod -R o-rwx /srv/share",Hardening,Linux,https://man7.org/linux/man-pages/,GPL-2.0,"permissions,hardening","Lock down shared directory permissions"
+8,"pwsh -Command \"Test-NetConnection -Port 443 security-appliance\"",Network Diagnostics,Windows,https://github.com/PowerShell/PowerShell,MIT,"network,troubleshooting","Check TLS port reachability against security appliance"
+9,"log show --predicate 'eventMessage CONTAINS ""SSH""' --last 1h",Monitoring,macOS,https://developer.apple.com/documentation,APL,"macos,logging","Retrieve SSH-related log events from the past hour"
+10,"terraform validate",Automation,Linux,https://github.com/hashicorp/terraform,MIT,"iac,devops","Validate infrastructure-as-code configuration before deployment"

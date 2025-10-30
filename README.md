@@ -24,6 +24,11 @@ src/
     decoder.py      # Causal LM head and weight tying logic
     modeling.py     # Tokenizer/model builders for pretrained + custom stacks
     train.py        # End-to-end training orchestration (preprocess → chunk → tokenise)
+docs/
+  *.md              # Dataset release playbooks, schema references, checklists
+data/
+  csv/              # Sample CSV shards illustrating terminal command records
+  jsonl/            # Sample JSONL shards mirroring CSV schema
 ```
 
 ## Quickstart
@@ -72,3 +77,7 @@ src/
 ## Disclaimer
 
 This project provides a reproducible template but does **not** ship the actual training datasets or trained checkpoints. You are responsible for sourcing data, validating licenses, and provisioning the large-scale compute necessary to train an AI coding assistant.
+
+### Dataset release toolkit
+
+The `/docs` directory now includes production-grade guidance for curating, validating, and distributing a multi-billion record terminal command dataset suitable for training AI systems focused on ethical hacking, blue teaming, and cross-platform administration. Use the provided playbooks, schema reference, and release checklist to operationalise dataset builds. Sample CSV/JSONL files in `/data` demonstrate the canonical schema and metadata expectations.
